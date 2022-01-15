@@ -77,16 +77,14 @@ impl<C: 'static + RPCConn> Client<C> {
      );
 
     command_generator!(
-        "estimate_smart_fee returns an estimation of a transaction fee rate (in dcr/KB)
-         that new transactions should pay if they desire to be mined in up to
-         'confirmations' blocks and the block number where the estimate was found.
-        
-         The mode parameter (roughly) selects the different thresholds for accepting
-         an estimation as reasonable, allowing users to select different trade-offs
-         between probability of the transaction being mined in the given target
-         confirmation range and minimization of fees paid.
-        
-         As of 2019-01, only the default conservative mode is supported by dcrd.",
+        "estimate_smart_fee returns an estimation of a transaction fee rate (in dcr/KB) 
+        that new transactions should pay if they desire to be mined in up to 
+        'confirmations' blocks and the block number where the estimate was found.
+        \nThe mode parameter (roughly) selects the different thresholds for accepting 
+        an estimation as reasonable, allowing users to select different trade-offs 
+        between probability of the transaction being mined in the given target 
+        confirmation range and minimization of fees paid.
+        \nAs of 2019-01, only the default conservative mode is supported by dcrd.",
         estimate_smart_fee,
         future_type::EstimateSmartFeeFuture,
         commands::METHOD_ESTIMATE_SMART_FEE,

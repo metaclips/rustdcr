@@ -52,8 +52,11 @@ mod conntest {
         Message::Text(marshalled)
     }
 
-    pub fn _start_server() {
-        let server = TcpListener::bind("127.0.0.1:3012").unwrap();
+    pub fn _start_server(ready: std::sync::mpsc::Sender<()>) {
+        let server = TcpListener::bind("127.0.0.1:3012").expect("unable to bind");
+
+        println!("Hello");
+        ready.send(()).expect("error sending ready signal");
 
         for stream in server.incoming() {
             spawn(move || {
@@ -138,11 +141,15 @@ mod conntest {
 
     #[tokio::test]
     async fn test_conn() {
+        let (sender, recvr) = std::sync::mpsc::channel();
+
         std::thread::spawn(|| {
-            _start_server();
+            _start_server(sender);
         });
 
         use crate::rpcclient::{client, notify::NotificationHandlers};
+
+        recvr.recv().unwrap();
 
         let mut test_client = client::new(WebsocketConnTest, NotificationHandlers::default())
             .await

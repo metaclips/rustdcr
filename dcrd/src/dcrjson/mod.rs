@@ -23,7 +23,7 @@ pub(crate) fn parse_hex_parameters(value: &serde_json::Value) -> Option<Vec<u8>>
         }
     };
 
-    match ring::test::from_hex(s.as_str()) {
+    match hex::decode(s) {
         Ok(v) => Some(v),
 
         Err(e) => {

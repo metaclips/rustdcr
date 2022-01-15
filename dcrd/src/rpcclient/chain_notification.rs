@@ -80,16 +80,14 @@ macro_rules! create_notif_future {
 
 impl<C: 'static + RPCConn> Client<C> {
     notification_generator!(
-        "notify_blocks registers the client to receive notifications when blocks are
-        connected and disconnected from the main chain.  The notifications are
-        delivered to the notification handlers associated with the client.  Calling
-        this function has no effect if there are no notification handlers and will
-        result in an error if the client is configured to run in HTTP POST mode.
-
-        The notifications delivered as a result of this call will be via one of
-        OnBlockConnected or OnBlockDisconnected.
-
-        NOTE: This is a non-wallet extension and requires a websocket connection.",
+        "notify_blocks registers the client to receive notifications when blocks are connected
+        and disconnected from the main chain.  The notifications are delivered to the 
+        notification handlers associated with the client.  Calling this function has no effect
+        if there are no notification handlers and will result in an error if the client is configured
+        to run in HTTP POST mode.
+        \nThe notifications delivered as a result of this call will be via one of OnBlockConnected or 
+        OnBlockDisconnected.
+        \n**NOTE: This is a non-wallet extension and requires a websocket connection.**",
         notify_blocks,
         NotificationsFuture,
         commands::METHOD_NOTIFY_BLOCKS.to_string(),
@@ -103,8 +101,8 @@ impl<C: 'static + RPCConn> Client<C> {
         chain and new tickets have matured. The notifications are delivered to the notification handlers
         associated with the client. Calling this function has no effect if there are no notification handlers
         and will result in an error if the client is configured to run in HTTP POST mode.
-        The notifications delivered as a result of this call will be via OnNewTickets.
-        NOTE: This is a chain extension and requires a websocket connection.)",
+        \nThe notifications delivered as a result of this call will be via OnNewTickets.
+        \n**NOTE: This is a chain extension and requires a websocket connection.**",
         notify_new_tickets,
         NotificationsFuture,
         commands::METHOD_NOTIFY_NEW_TICKETS.to_string(),
@@ -116,10 +114,8 @@ impl<C: 'static + RPCConn> Client<C> {
     notification_generator!(
         "notify_work registers the client to receive notifications when a new block
         template has been generated.
-
-        The notifications delivered as a result of this call will be via on_work.
-
-        NOTE: This is a dcrd extension and requires a websocket connection",
+        \nThe notifications delivered as a result of this call will be via on_work.
+        \n**NOTE: This is a dcrd extension and requires a websocket connection**",
         notify_work,
         NotificationsFuture,
         commands::METHOD_NOTIFIY_NEW_WORK.to_string(),
@@ -134,11 +130,10 @@ impl<C: 'static + RPCConn> Client<C> {
         delivered to the notification handlers associated with the client.  Calling
         this function has no effect if there are no notification handlers and will
         result in an error if the client is configured to run in HTTP POST mode.
-        The notifications delivered as a result of this call will be via one of
+        \nThe notifications delivered as a result of this call will be via one of
         on_tx_accepted (when verbose is false) or on_tx_accepted_verbose (when verbose is
         true).
-        
-        NOTE: This is a dcrd extension and requires a websocket connection.",
+        \n**NOTE: This is a dcrd extension and requires a websocket connection.**",
         notify_new_transactions,
         NotificationsFuture,
         commands::METHOD_NEW_TX.to_string(),
@@ -210,7 +205,7 @@ pub(super) fn on_block_connected(
     let mut transactions = Vec::new();
 
     for hex_transaction in hex_transactions {
-        match ring::test::from_hex(hex_transaction.as_str()) {
+        match hex::decode(hex_transaction) {
             Ok(v) => transactions.push(v),
 
             Err(e) => {

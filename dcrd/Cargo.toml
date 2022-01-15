@@ -3,6 +3,7 @@ name = "rustdcr"
 version = "0.1.0"
 authors = ["michael <utimichael9@gmail.com>"]
 edition = "2021"
+license = "MIT"
 
 [dev-dependencies]
 criterion = "0.3.5"
@@ -20,10 +21,9 @@ path = "benches/lib.rs"
 
 [dependencies]
 # Required Dependencies.
-base64 = "0.12.3"
+base64 = "0.13.0"
 tokio = { version = "1.14.0", features = ["full"] }
 log = "0.4.11"
-ring = "0.16.20"
 hex = "0.4.3"
 
 # App Data Dir Package.
