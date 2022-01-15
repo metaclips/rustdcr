@@ -1,1 +1,1 @@
-Contains Decred infrastructures in [Rust](https://www.rust-lang.org)
+Contains [Decred](https://decred.org) infrastructures in [Rust](https://www.rust-lang.org)

@@ -55,7 +55,6 @@ mod conntest {
     pub fn _start_server(ready: std::sync::mpsc::Sender<()>) {
         let server = TcpListener::bind("127.0.0.1:3012").expect("unable to bind");
 
-        println!("Hello");
         ready.send(()).expect("error sending ready signal");
 
         for stream in server.incoming() {
