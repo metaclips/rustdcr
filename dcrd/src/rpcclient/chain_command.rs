@@ -8,6 +8,10 @@ use {
 };
 
 /// Generates clients command
+///
+/// To generate a command, we pass the documentation of the chain command as its first parameter
+/// function name of the RPC command as its second parameter future type of the RPC command
+/// RPC command to be sent to the server
 macro_rules! command_generator {
     ($doc: tt, $name: ident, $output_type: ty, $command: expr, $json_params: expr, $($fn_params:ident : $fn_type: ty),*) => {
         #[doc = $doc]

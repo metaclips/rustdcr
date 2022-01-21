@@ -23,7 +23,6 @@ mod conntest {
         dcrjson::{commands, result_types::JsonResponse},
         rpcclient::{self, connection::Websocket, error::RpcClientError, infrastructure::Command},
     };
-    // use serde_json::Value;
     use tokio_tungstenite::tungstenite::error;
 
     /// Implements JSON RPC request structure to server.
@@ -83,7 +82,7 @@ mod conntest {
 
                         Err(e) => match e {
                             error::Error::ConnectionClosed => return,
-                            _ => panic!("connection closed abruptly"),
+                            _ => panic!("connection closed abruptly: {}", e),
                         },
                     };
                     if msg.is_binary() || msg.is_text() {
@@ -176,6 +175,36 @@ mod conntest {
         test_client.get_block_count().await.unwrap().await.unwrap();
 
         // TODO: Try sending request here.
+        test_client.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_invalid_notification() {
+        let (sender, recvr) = std::sync::mpsc::channel();
+
+        std::thread::spawn(|| {
+            _start_server(sender);
+        });
+
+        use crate::rpcclient::{client, notify::NotificationHandlers};
+
+        recvr.recv().unwrap();
+
+        let mut test_client = client::new(WebsocketConnTest, NotificationHandlers::default())
+            .await
+            .unwrap();
+
+        let result = test_client.notify_new_transactions(true).await;
+        assert!(result.is_err());
+
+        assert_eq!(
+            format!("{}", result.err().unwrap()),
+            format!(
+                "{}",
+                RpcClientError::UnregisteredNotification(commands::METHOD_NEW_TX.to_string())
+            )
+        );
+
         test_client.shutdown().await;
     }
 }

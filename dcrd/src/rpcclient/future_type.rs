@@ -14,6 +14,7 @@ use {
     tokio::sync::mpsc,
 };
 
+/// Build a RPC command future type.
 macro_rules! build_future {
     ($struct_name:ident, $output:ty) => {
         pub struct $struct_name {

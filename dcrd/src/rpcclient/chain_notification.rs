@@ -14,36 +14,27 @@ use {
 };
 
 macro_rules! notification_generator {
-    ($doc: tt, $name: ident, $return_type: ty, $command: expr, $param: expr, ($($callback_name: tt),*), ($($fn_params:ident : $fn_type: ty),*)) => {
+    ($doc: tt, $name: ident, $return_type: ty, $command: expr, $param: expr, all_defined($($callback_name: tt),*), ($($fn_params:ident : $fn_type: ty),*)) => {
         #[doc = $doc]
         pub async fn $name(&mut self, $($fn_params : $fn_type),*) -> Result<$return_type, RpcClientError> {
             check_config!(self);
-            callback_check!(self, $command, ($($callback_name),*));
+            callback_check!(self, $command, all_defined($($callback_name),*));
             create_notif_future!(self, $command, $param)
         }
     };
 
-    ($doc: tt, $name: ident, $return_type: ty, $command: expr, $param: expr, or($($callback_name: tt),*), ($($fn_params:ident : $fn_type: ty),*)) => {
+    ($doc: tt, $name: ident, $return_type: ty, $command: expr, $param: expr, either_defined($($callback_name: tt),*), ($($fn_params:ident : $fn_type: ty),*)) => {
         #[doc = $doc]
         pub async fn $name(&mut self, $($fn_params : $fn_type),*) -> Result<$return_type, RpcClientError> {
             check_config!(self);
-            callback_check!(self, $command, or ($($callback_name),*));
-            create_notif_future!(self, $command, $param)
-        }
-    };
-
-    ($doc: tt, $name: ident, $return_type: ty, $command: expr, $param: expr, and($($callback_name: tt),*), ($($fn_params:ident : $fn_type: ty),*)) => {
-        #[doc = $doc]
-        pub async fn $name(&mut self, $($fn_params : $fn_type),*) -> Result<$return_type, RpcClientError> {
-            check_config!(self);
-            callback_check!(self, $command, and ($($callback_name),*));
+            callback_check!(self, $command, either_defined($($callback_name),*));
             create_notif_future!(self, $command, $param)
         }
     };
 }
 
 macro_rules! callback_check {
-    ($self: ident, $name: expr, and($($callback_name: tt), *)) => {
+    ($self: ident, $name: expr, either_defined($($callback_name: tt), *)) => {
         $(
             let $callback_name = $self.notification_handler.$callback_name;
         )*
@@ -56,7 +47,7 @@ macro_rules! callback_check {
         }
     };
 
-    ($self: ident, $name: expr, ($($callback_name: tt), *)) => {
+    ($self: ident, $name: expr, all_defined($($callback_name: tt), *)) => {
         $(
             let $callback_name = $self.notification_handler.$callback_name;
         )*
@@ -92,7 +83,7 @@ impl<C: 'static + RPCConn> Client<C> {
         NotificationsFuture,
         commands::METHOD_NOTIFY_BLOCKS.to_string(),
         &[],
-        (on_block_connected, on_block_disconnected),
+        all_defined(on_block_connected, on_block_disconnected),
         ()
     );
 
@@ -107,7 +98,7 @@ impl<C: 'static + RPCConn> Client<C> {
         NotificationsFuture,
         commands::METHOD_NOTIFY_NEW_TICKETS.to_string(),
         &[],
-        (on_new_tickets),
+        all_defined(on_new_tickets),
         ()
     );
 
@@ -120,7 +111,7 @@ impl<C: 'static + RPCConn> Client<C> {
         NotificationsFuture,
         commands::METHOD_NOTIFIY_NEW_WORK.to_string(),
         &[],
-        (on_work),
+        all_defined(on_work),
         ()
     );
 
@@ -138,7 +129,7 @@ impl<C: 'static + RPCConn> Client<C> {
         NotificationsFuture,
         commands::METHOD_NEW_TX.to_string(),
         &[serde_json::json!(verbose)],
-        and(on_tx_accepted, on_tx_accepted_verbose),
+        either_defined(on_tx_accepted, on_tx_accepted_verbose),
         (verbose: bool)
     );
 
