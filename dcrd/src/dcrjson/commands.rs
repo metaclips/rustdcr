@@ -22,6 +22,7 @@ pub(crate) const NOTIFICATION_METHOD_TX_ACCEPTED_VERBOSE: &str = "txacceptedverb
 pub(crate) const NOTIFICATION_METHOD_STAKE_DIFFICULTY: &str = "stakedifficulty";
 /// Notifies that the block chain is in the process of a reorganization.
 pub(crate) const NOTIFICATION_METHOD_REORGANIZATION: &str = "reorganization";
+pub(crate) const NOTIFICATION_METHOD_SPENT_AND_MISSING_TICKETS: &str = "spentandmissedtickets";
 
 /// Issues a notify blocks command to RPC server.
 pub(crate) const METHOD_NOTIFY_BLOCKS: &str = "notifyblocks";
@@ -31,7 +32,8 @@ pub(crate) const METHOD_NOTIFY_NEW_TICKETS: &str = "notifynewtickets";
 pub(crate) const METHOD_NOTIFIY_NEW_WORK: &str = "notifywork";
 /// Registers the client to receive either a txaccepted or a txacceptedverbose notification
 /// when a new transaction is accepted into the mempool.
-pub(crate) const METHOD_NEW_TX: &str = "notifynewtransactions";
+pub(crate) const METHOD_NOTIFY_NEW_TX: &str = "notifynewtransactions";
+pub(crate) const METHOD_NOTIFY_SPEND_AND_MISSED_TICKETS: &str = "notifyspentandmissedtickets";
 
 /// Returns information about the current state of the block chain.
 pub(crate) const METHOD_GET_BLOCKCHAIN_INFO: &str = "getblockchaininfo";
