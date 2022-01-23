@@ -6,14 +6,14 @@
 
 mod conntest {
     use async_trait::async_trait;
-    use futures_util::stream::{SplitSink, SplitStream, StreamExt};
-    use std::net::TcpListener;
-    use std::thread::spawn;
+    use futures_util::{
+        stream::{SplitSink, SplitStream, StreamExt},
+        SinkExt,
+    };
     use tokio::sync::mpsc;
     use tokio_tungstenite::{
-        connect_async,
+        accept_hdr_async, connect_async,
         tungstenite::{
-            accept_hdr,
             handshake::{client::Request, server::Response},
             Message,
         },
@@ -25,6 +25,92 @@ mod conntest {
     };
     use tokio_tungstenite::tungstenite::error;
 
+    #[tokio::test]
+    async fn test_conn() {
+        println!("starting test");
+        let (sender, mut recvr) = tokio::sync::mpsc::channel(1);
+        let url = "127.0.0.1:3000";
+
+        tokio::spawn(async {
+            _start_server(url, sender).await;
+            println!("server stopped");
+        });
+
+        use crate::rpcclient::{client, notify::NotificationHandlers};
+
+        recvr.recv().await.unwrap();
+        println!("recvd");
+
+        let mut test_client = client::new(
+            WebsocketConnTest {
+                url: url.to_string(),
+            },
+            NotificationHandlers::default(),
+        )
+        .await
+        .unwrap();
+
+        test_client.disconnect().await;
+
+        // TODO: Try sending request here.
+        match test_client.get_block_count().await.err().unwrap() {
+            RpcClientError::RpcDisconnected => println!("client disconnected"),
+            e => panic!("rpcclient client not disconnected: {}", e),
+        }
+
+        assert!(
+            test_client.is_disconnected().await,
+            "websocket wasnt disconnected"
+        );
+
+        match test_client.connect().await {
+            Ok(_) => println!("websocket reconnected"),
+            Err(e) => panic!("websocket errored reconnecting: {}", e),
+        };
+
+        test_client.get_block_count().await.unwrap().await.unwrap();
+
+        test_client.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_invalid_notification() {
+        println!("starting test");
+        let (sender, mut recvr) = tokio::sync::mpsc::channel(1);
+        let url = "127.0.0.1:3001";
+
+        tokio::spawn(async {
+            _start_server(url, sender).await;
+            println!("server stopped");
+        });
+
+        use crate::rpcclient::{client, notify::NotificationHandlers};
+
+        recvr.recv().await.unwrap();
+
+        let mut test_client = client::new(
+            WebsocketConnTest {
+                url: url.to_string(),
+            },
+            NotificationHandlers::default(),
+        )
+        .await
+        .unwrap();
+
+        let result = test_client.notify_new_transactions(true).await;
+        assert!(result.is_err());
+
+        assert_eq!(
+            format!("{}", result.err().unwrap()),
+            format!(
+                "{}",
+                RpcClientError::UnregisteredNotification(commands::METHOD_NEW_TX.to_string())
+            )
+        );
+
+        test_client.shutdown().await;
+    }
+
     /// Implements JSON RPC request structure to server.
     #[derive(serde::Deserialize)]
     pub struct TestRequest<'a> {
@@ -35,9 +121,11 @@ mod conntest {
     }
 
     #[derive(Clone)]
-    struct WebsocketConnTest;
+    struct WebsocketConnTest {
+        pub url: String,
+    }
 
-    pub fn _mock_get_block_count(id: u64) -> Message {
+    fn _mock_get_block_count(id: u64) -> Message {
         let res = JsonResponse {
             id: serde_json::json!(id),
             method: serde_json::json!(commands::METHOD_GET_BLOCK_COUNT),
@@ -51,13 +139,19 @@ mod conntest {
         Message::Text(marshalled)
     }
 
-    pub fn _start_server(ready: std::sync::mpsc::Sender<()>) {
-        let server = TcpListener::bind("127.0.0.1:3012").expect("unable to bind");
+    async fn _start_server(url: &str, ready: tokio::sync::mpsc::Sender<()>) {
+        let server = tokio::net::TcpListener::bind(url)
+            .await
+            .expect("unable to bind");
 
-        ready.send(()).expect("error sending ready signal");
+        println!("Server listening");
 
-        for stream in server.incoming() {
-            spawn(move || {
+        ready.send(()).await.expect("error sending ready signal");
+
+        println!("looking for connections");
+
+        loop {
+            if let Ok(stream) = server.accept().await {
                 let callback = |req: &Request, response: Response| {
                     println!("Received a new ws handshake");
                     println!("The request's path is: {}", req.uri().path());
@@ -74,30 +168,37 @@ mod conntest {
                     Ok(response)
                 };
 
-                let mut websocket = accept_hdr(stream.unwrap(), callback).unwrap();
+                let websocket = accept_hdr_async(stream.0, callback).await.unwrap();
 
-                loop {
-                    let msg = match websocket.read_message() {
+                println!("found a conn on ip: {}", stream.1);
+                let (mut write, mut read) = websocket.split();
+
+                while let Some(msg) = read.next().await {
+                    let msg = match msg {
                         Ok(msg) => msg,
 
                         Err(e) => match e {
-                            error::Error::ConnectionClosed => return,
+                            error::Error::ConnectionClosed => break,
                             _ => panic!("connection closed abruptly: {}", e),
                         },
                     };
+
                     if msg.is_binary() || msg.is_text() {
                         let msg_to_str = &msg.to_string();
                         let res: TestRequest = serde_json::from_str(msg_to_str).unwrap();
 
                         match res.method {
-                            commands::METHOD_GET_BLOCK_COUNT => websocket
-                                .write_message(_mock_get_block_count(res.id))
-                                .unwrap(),
+                            commands::METHOD_GET_BLOCK_COUNT => {
+                                write.send(_mock_get_block_count(res.id)).await.unwrap()
+                            }
                             _ => unreachable!(),
-                        }
+                        };
+                    } else if msg.is_close() {
+                        println!("close message received");
+                        break;
                     }
                 }
-            });
+            }
         }
     }
 
@@ -107,7 +208,7 @@ mod conntest {
             &mut self,
         ) -> Result<(SplitStream<Websocket>, SplitSink<Websocket, Message>), RpcClientError>
         {
-            let (ws_stream, _) = connect_async("ws://127.0.0.1:3012")
+            let (ws_stream, _) = connect_async(format!("ws://{}", self.url))
                 .await
                 .expect("Failed to connect");
             println!("WebSocket handshake has been successfully completed");
@@ -135,76 +236,5 @@ mod conntest {
         ) -> Result<(), RpcClientError> {
             todo!()
         }
-    }
-
-    #[tokio::test]
-    async fn test_conn() {
-        let (sender, recvr) = std::sync::mpsc::channel();
-
-        std::thread::spawn(|| {
-            _start_server(sender);
-        });
-
-        use crate::rpcclient::{client, notify::NotificationHandlers};
-
-        recvr.recv().unwrap();
-
-        let mut test_client = client::new(WebsocketConnTest, NotificationHandlers::default())
-            .await
-            .unwrap();
-
-        test_client.disconnect().await;
-
-        // TODO: Try sending request here.
-        match test_client.get_block_count().await.err().unwrap() {
-            RpcClientError::RpcDisconnected => println!("client disconnected"),
-            e => panic!("rpcclient client not disconnected: {}", e),
-        }
-
-        assert!(
-            test_client.is_disconnected().await,
-            "websocket wasnt disconnected"
-        );
-
-        match test_client.connect().await {
-            Ok(_) => println!("websocket reconnected"),
-            Err(e) => panic!("websocket errored reconnecting: {}", e),
-        };
-
-        // TODO: Try sending request here.
-        test_client.get_block_count().await.unwrap().await.unwrap();
-
-        // TODO: Try sending request here.
-        test_client.shutdown().await;
-    }
-
-    #[tokio::test]
-    async fn test_invalid_notification() {
-        let (sender, recvr) = std::sync::mpsc::channel();
-
-        std::thread::spawn(|| {
-            _start_server(sender);
-        });
-
-        use crate::rpcclient::{client, notify::NotificationHandlers};
-
-        recvr.recv().unwrap();
-
-        let mut test_client = client::new(WebsocketConnTest, NotificationHandlers::default())
-            .await
-            .unwrap();
-
-        let result = test_client.notify_new_transactions(true).await;
-        assert!(result.is_err());
-
-        assert_eq!(
-            format!("{}", result.err().unwrap()),
-            format!(
-                "{}",
-                RpcClientError::UnregisteredNotification(commands::METHOD_NEW_TX.to_string())
-            )
-        );
-
-        test_client.shutdown().await;
     }
 }
