@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["michael <utimichael9@gmail.com>"]
 edition = "2021"
 license = "MIT"
+keywords = ["Decred", "cryptocurrency", "cryptography"]
+description = "Decred daemon infrastructure in Rust"
+readme = "readme.md"
 
 [dev-dependencies]
 criterion = "0.3.5"
