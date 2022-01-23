@@ -22,7 +22,7 @@ path = "benches/lib.rs"
 [dependencies]
 # Required Dependencies.
 base64 = "0.13.0"
-tokio = { version = "1.14.0", features = ["full"] }
+tokio = { version = "1.15.0", features = ["full"] }
 log = "0.4.11"
 hex = "0.4.3"
 
