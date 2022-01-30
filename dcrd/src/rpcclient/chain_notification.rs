@@ -1,6 +1,7 @@
 //! Chain Notification Commands.
 //! Contains all chain non-wallet notification commands to RPC server.
 
+#![doc(hidden)]
 use std::collections::HashMap;
 
 use super::connection::RPCConn;

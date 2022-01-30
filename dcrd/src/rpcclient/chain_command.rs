@@ -1,3 +1,4 @@
+#![doc(hidden)]
 use crate::dcrjson::cmd_types;
 
 use {
