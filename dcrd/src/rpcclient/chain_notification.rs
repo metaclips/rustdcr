@@ -1,13 +1,16 @@
 //! Chain Notification Commands.
 //! Contains all chain non-wallet notification commands to RPC server.
 
+#![doc(hidden)]
+use std::collections::HashMap;
+
 use super::connection::RPCConn;
 
 use {
     super::{check_config, error::RpcClientError, future_type::NotificationsFuture},
     crate::{
         chaincfg::chainhash::Hash,
-        dcrjson::{commands, parse_hex_parameters, result_types},
+        dcrjson::{commands, marshal_to_hash, parse_hex_parameters, result_types},
         rpcclient::client::Client,
     },
     log::{trace, warn},
@@ -81,7 +84,7 @@ impl<C: 'static + RPCConn> Client<C> {
         \n**NOTE: This is a non-wallet extension and requires a websocket connection.**",
         notify_blocks,
         NotificationsFuture,
-        commands::METHOD_NOTIFY_BLOCKS.to_string(),
+        commands::METHOD_NOTIFY_BLOCKS,
         &[],
         all_defined(on_block_connected, on_block_disconnected),
         ()
@@ -96,7 +99,7 @@ impl<C: 'static + RPCConn> Client<C> {
         \n**NOTE: This is a chain extension and requires a websocket connection.**",
         notify_new_tickets,
         NotificationsFuture,
-        commands::METHOD_NOTIFY_NEW_TICKETS.to_string(),
+        commands::METHOD_NOTIFY_NEW_TICKETS,
         &[],
         all_defined(on_new_tickets),
         ()
@@ -109,7 +112,7 @@ impl<C: 'static + RPCConn> Client<C> {
         \n**NOTE: This is a dcrd extension and requires a websocket connection**",
         notify_work,
         NotificationsFuture,
-        commands::METHOD_NOTIFIY_NEW_WORK.to_string(),
+        commands::METHOD_NOTIFIY_NEW_WORK,
         &[],
         all_defined(on_work),
         ()
@@ -127,18 +130,34 @@ impl<C: 'static + RPCConn> Client<C> {
         \n**NOTE: This is a dcrd extension and requires a websocket connection.**",
         notify_new_transactions,
         NotificationsFuture,
-        commands::METHOD_NEW_TX.to_string(),
+        commands::METHOD_NOTIFY_NEW_TX,
         &[serde_json::json!(verbose)],
         either_defined(on_tx_accepted, on_tx_accepted_verbose),
         (verbose: bool)
     );
 
+    notification_generator!(
+        "notify_spent_and_missed_tickets registers the client to receive notifications 
+        when blocks are connected to the main chain and tickets are spent or missed. 
+        The notifications are delivered to the notification handlers associated with the client. 
+        Calling this function has no effect if there are no notification handlers and will result in 
+        an error if the client is configured to run in HTTP POST mode.
+        \nThe notifications delivered as a result of this call will be those from OnSpentAndMissedTickets.
+        \n**NOTE: This is a dcrd extension and requires a websocket connection.**",
+        notify_spent_and_missed_tickets,
+        NotificationsFuture,
+        commands::METHOD_NOTIFY_SPEND_AND_MISSED_TICKETS,
+        &[],
+        all_defined(on_spent_and_missed_tickets),
+        ()
+    );
+
     async fn create_notification(
         &mut self,
-        method: String,
+        method: &str,
         params: &[serde_json::Value],
     ) -> Result<NotificationsFuture, RpcClientError> {
-        let (id, result_receiver) = match self.send_custom_command(&method, params).await {
+        let (id, result_receiver) = match self.send_custom_command(method, params).await {
             Ok(e) => e,
 
             Err(e) => return Err(e),
@@ -146,7 +165,7 @@ impl<C: 'static + RPCConn> Client<C> {
 
         // Register notification command to active notifications for reconnection.
         let mut notification_state = self.notification_state.write().await;
-        notification_state.insert(method, id);
+        notification_state.insert(method.to_string(), id);
 
         Ok(NotificationsFuture {
             message: result_receiver,
@@ -489,4 +508,70 @@ pub(super) fn on_tx_accepted_verbose(
     };
 
     on_tx_verbose_callback(tx_details);
+}
+
+pub(super) fn on_spent_and_missed_tickets(
+    params: &[serde_json::Value],
+    on_spent_and_missed_tickets_callback: fn(
+        hash: Hash,
+        height: i32,
+        stake_diff: i64,
+        tickets: HashMap<String, bool>,
+    ),
+) {
+    trace!("Received spent and missed tickets notification");
+
+    if params.len() != 4 {
+        warn!(
+            "Server sent wrong number of parameters on spent and missed tickets notification handler"
+        );
+        return;
+    }
+
+    let hash = match marshal_to_hash(params[0].clone()) {
+        Some(e) => e,
+
+        None => {
+            warn!("Error marshalling hash in on spent and missed tickets");
+            return;
+        }
+    };
+
+    let height: i32 = match serde_json::from_value(params[1].clone()) {
+        Ok(e) => e,
+
+        Err(e) => {
+            warn!(
+                "Error marshalling height in on transaction on spent and missed tickets, error: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    let stake_diff: i64 = match serde_json::from_value(params[2].clone()) {
+        Ok(e) => e,
+
+        Err(e) => {
+            warn!(
+                "Error marshalling stake diff in on transaction on spent and missed tickets, error: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    let tickets: HashMap<String, bool> = match serde_json::from_value(params[3].clone()) {
+        Ok(e) => e,
+
+        Err(e) => {
+            warn!(
+                "Error marshalling tickets in on transaction on spent and missed tickets, error: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    on_spent_and_missed_tickets_callback(hash, height, stake_diff, tickets);
 }

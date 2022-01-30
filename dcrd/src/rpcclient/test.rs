@@ -104,7 +104,9 @@ mod conntest {
             format!("{}", result.err().unwrap()),
             format!(
                 "{}",
-                RpcClientError::UnregisteredNotification(commands::METHOD_NEW_TX.to_string())
+                RpcClientError::UnregisteredNotification(
+                    commands::METHOD_NOTIFY_NEW_TX.to_string()
+                )
             )
         );
 

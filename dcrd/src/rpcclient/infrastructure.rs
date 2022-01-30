@@ -753,6 +753,16 @@ pub(super) async fn handle_notification(
                     }
                 },
 
+                commands::NOTIFICATION_METHOD_SPENT_AND_MISSING_TICKETS => {
+                    match notif.on_spent_and_missed_tickets {
+                        Some(e) => chain_notification::on_spent_and_missed_tickets(&msg.params, e),
+                        None => {
+                            warn!("on spent and missing tickets callback not registered.");
+                            continue;
+                        }
+                    }
+                }
+
                 _ => match notif.on_unknown_notification {
                     Some(e) => {
                         e(method.to_string(), msg);

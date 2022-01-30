@@ -53,7 +53,7 @@ pub struct NotificationHandlers {
     /// invoked if a preceding call to NotifySpentAndMissedTickets has been made to
     /// register for the notification and the function is non-nil.
     pub on_spent_and_missed_tickets:
-        Option<fn(hash: Hash, height: i64, stake_diff: i64, tickets: HashMap<Hash, bool>)>,
+        Option<fn(hash: Hash, height: i32, stake_diff: i64, tickets: HashMap<String, bool>)>,
 
     /// on_new_tickets callback function is invoked when a block is connected to the longest `best` chain
     /// and tickets have matured and become active. It will only be invoked
